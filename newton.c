@@ -16,19 +16,15 @@
 pthread_mutex_t item_done_mutex;
 
 // Arrays for communication between computing and writing threads
-char ** roots;     // The matrix that holds the results of roots
-char ** iters;     // The matrix that holds the results of iterations
-char  * item_done; // To mark a row as done
+unsigned char ** roots; // The matrix that holds the results of roots
+unsigned char ** iters; // The matrix that holds the results of iterations
+char * item_done; // To mark a row as done
 
 // The exact roots
 double * exact_roots_real;
 double * exact_roots_imag;
 
 double step_size; // Step size for starting points of newton method
-
-// Lookup table for colours and the size of a colour code
-char * lookup_inttostr;
-int colour_code_size;
 
 int n_rows = 1000; // The size of the image (number of rows and columns)
 int n_threads; // The number of threads
@@ -156,8 +152,8 @@ next_newton (double complex z,
  */
 inline void
 newton_method (complex double z,
-               char * root,
-               char * iters)
+               unsigned char * root,
+               unsigned char * iters)
 {// {{{
     unsigned int n_iter = 0;
     double z_real, z_imag, z_real_d, z_imag_d;
@@ -174,8 +170,8 @@ newton_method (complex double z,
                 || -z_real > CANCEL_THRESHOLD
                 ||  z_imag > CANCEL_THRESHOLD
                 || -z_imag > CANCEL_THRESHOLD) {
-            strncpy (root, lookup_inttostr + (colour_code_size+1)*exp_d, colour_code_size);
-            strncpy (iters, lookup_inttostr, colour_code_size);
+            *root = exp_d;
+            *iters = 0;
             return;
         }
 
@@ -184,7 +180,7 @@ newton_method (complex double z,
             z_real_d = z_real - exact_roots_real[mi];
             z_imag_d = z_imag - exact_roots_imag[mi];
             if (((z_real_d * z_real_d) + (z_imag_d * z_imag_d)) < TOLERANCE) {
-                strncpy (root, lookup_inttostr + mi*(colour_code_size+1), colour_code_size);
+                *root = mi;
                 cont = false;
             }
         }
@@ -194,7 +190,7 @@ newton_method (complex double z,
     }
 
     // Set number of iterations, but maximal MAX_ITERATIONS
-    strncpy (iters, lookup_inttostr + MIN(n_iter,MAX_ITERATIONS)*(colour_code_size+1), colour_code_size);
+    *iters = MIN (n_iter, MAX_ITERATIONS);
 }// }}}
 
 /**
@@ -208,21 +204,18 @@ compute_main (void * args)
     free (args);
 
     double complex z;
-    size_t buffer_size = (n_rows * colour_code_size + 1) * sizeof(char);
-    size_t buffer_last = buffer_size - 1;
+    size_t buffer_size = n_rows * sizeof(unsigned char);
 
     for (size_t ix = offset; ix < n_rows; ix += n_threads) {
 
         // Initialize a local buffer
-        char * roots_row = malloc (buffer_size);
-        char * iters_row = malloc (buffer_size);
-        roots_row[buffer_last] = '\n';
-        iters_row[buffer_last] = '\n';
+        unsigned char * roots_row = malloc (buffer_size);
+        unsigned char * iters_row = malloc (buffer_size);
 
         // Compute the root using the Newton method for each item in the row ix
         for (size_t jx = 0; jx < n_rows; jx++) {
             z = (-2 + jx*step_size) + I * (2 - ix*step_size);
-            newton_method (z, roots_row + colour_code_size*jx, iters_row + colour_code_size*jx);
+            newton_method (z, roots_row + jx, iters_row + jx);
         }
 
         // Write the results to the matrices
@@ -262,8 +255,8 @@ write_main (void * args)
     FILE * roots_file = fopen (buf_attractors, "wb");
     FILE * iters_file = fopen (buf_convergence, "wb");
 
-    fprintf (roots_file, "P2\n%d %d\n%d\n", n_rows, n_rows, exp_d);
-    fprintf (iters_file, "P2\n%d %d\n%d\n", n_rows, n_rows, MAX_ITERATIONS);
+    fprintf (roots_file, "P5\n%d %d\n%d\n", n_rows, n_rows, exp_d);
+    fprintf (iters_file, "P5\n%d %d\n%d\n", n_rows, n_rows, MAX_ITERATIONS);
 
     for (size_t ix = 0; ix < n_rows;) {
 
@@ -280,8 +273,8 @@ write_main (void * args)
 
         // Write to the files
         for (; ix < n_rows && item_done_loc[ix] != 0; ++ix) {
-            fwrite (roots[ix], sizeof(char), n_rows * colour_code_size + 1, roots_file);
-            fwrite (iters[ix], sizeof(char), n_rows * colour_code_size + 1, iters_file);
+            fwrite (roots[ix], sizeof(unsigned char), n_rows, roots_file);
+            fwrite (iters[ix], sizeof(unsigned char), n_rows, iters_file);
             free (roots[ix]);
             free (iters[ix]);
         }
@@ -317,21 +310,9 @@ main (int argc,
     }
 
     // Allocating memory for the roots and iters matrices, and the item_done array
-    roots = malloc (n_rows * sizeof(char *));
-    iters = malloc (n_rows * sizeof(char *));
+    roots = malloc (n_rows * sizeof(unsigned char *));
+    iters = malloc (n_rows * sizeof(unsigned char *));
     item_done = calloc (n_rows, sizeof(char));
-
-    // Derive the size of a colour code from the iterations cap
-    char * tmp = malloc (10 * sizeof(char));
-    sprintf (tmp, "%d", MAX_ITERATIONS);
-    colour_code_size = strlen(tmp) + 1;
-
-    // Initialise the lookup string for colour codes
-    lookup_inttostr = malloc ((MAX_ITERATIONS+1) * (colour_code_size+1) * sizeof(char));
-    int width = colour_code_size - 1;
-    for (int ix = 0; ix < (MAX_ITERATIONS+1); ix++) {
-        sprintf (lookup_inttostr + ix*(colour_code_size+1), "%2$0*1$i ", width, ix);
-    }
 
     // Threading
     pthread_mutex_init (&item_done_mutex, NULL);
@@ -372,7 +353,6 @@ main (int argc,
     free (item_done);
     free (exact_roots_real);
     free (exact_roots_imag);
-    free (lookup_inttostr);
 
     return EX_OK;
 }// }}}
