@@ -256,14 +256,14 @@ write_main (void * args)
     char buf_attractors  [35];
     char buf_convergence [35];
 
-    sprintf (buf_attractors,  "newton_attractors_x%02d.ppm",  exp_d);
-    sprintf (buf_convergence, "newton_convergence_x%02d.ppm", exp_d);
+    sprintf (buf_attractors,  "newton_attractors_x%02d.pgm",  exp_d);
+    sprintf (buf_convergence, "newton_convergence_x%02d.pgm", exp_d);
 
     FILE * roots_file = fopen (buf_attractors, "wb");
     FILE * iters_file = fopen (buf_convergence, "wb");
 
-    fprintf (roots_file, "P3\n%d %d\n%d\n", n_rows, n_rows, exp_d);
-    fprintf (iters_file, "P3\n%d %d\n%d\n", n_rows, n_rows, MAX_ITERATIONS);
+    fprintf (roots_file, "P2\n%d %d\n%d\n", n_rows, n_rows, exp_d);
+    fprintf (iters_file, "P2\n%d %d\n%d\n", n_rows, n_rows, MAX_ITERATIONS);
 
     for (size_t ix = 0; ix < n_rows;) {
 
@@ -324,13 +324,13 @@ main (int argc,
     // Derive the size of a colour code from the iterations cap
     char * tmp = malloc (10 * sizeof(char));
     sprintf (tmp, "%d", MAX_ITERATIONS);
-    colour_code_size = 3 * (strlen(tmp) + 1);
+    colour_code_size = strlen(tmp) + 1;
 
     // Initialise the lookup string for colour codes
     lookup_inttostr = malloc ((MAX_ITERATIONS+1) * (colour_code_size+1) * sizeof(char));
-    int width = (colour_code_size-1) /3;
+    int width = colour_code_size - 1;
     for (int ix = 0; ix < (MAX_ITERATIONS+1); ix++) {
-        sprintf (lookup_inttostr + ix*(colour_code_size+1), "%2$0*1$i %2$0*1$i %2$0*1$i ", width, ix);
+        sprintf (lookup_inttostr + ix*(colour_code_size+1), "%2$0*1$i ", width, ix);
     }
 
     // Threading
