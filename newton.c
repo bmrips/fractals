@@ -202,13 +202,16 @@ compute_main (void * args)
     free (args);
 
     double complex z;
-    size_t buffer_size = n_rows * colour_code_size * sizeof(char);
+    size_t buffer_size = (n_rows * colour_code_size + 1) * sizeof(char);
+    size_t buffer_last = buffer_size - 1;
 
     for (size_t ix = offset; ix < n_rows; ix += n_threads) {
 
         // Initialize a local buffer
         char * roots_row = malloc (buffer_size);
         char * iters_row = malloc (buffer_size);
+        roots_row[buffer_last] = '\n';
+        iters_row[buffer_last] = '\n';
 
         // Compute the root using the Newton method for each item in the row ix
         for (size_t jx = 0; jx < n_rows; jx++) {
@@ -271,10 +274,8 @@ write_main (void * args)
 
         // Write to the files
         for (; ix < n_rows && item_done_loc[ix] != 0; ++ix) {
-            fwrite (roots[ix], sizeof(char), n_rows * colour_code_size, roots_file);
-            fwrite (iters[ix], sizeof(char), n_rows * colour_code_size, iters_file);
-            fwrite ("\n", sizeof(char), 1, roots_file);
-            fwrite ("\n", sizeof(char), 1, iters_file);
+            fwrite (roots[ix], sizeof(char), n_rows * colour_code_size + 1, roots_file);
+            fwrite (iters[ix], sizeof(char), n_rows * colour_code_size + 1, iters_file);
             free (roots[ix]);
             free (iters[ix]);
         }
