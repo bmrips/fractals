@@ -125,13 +125,19 @@ parse_args (int argc,
  */
 inline double complex
 power (double complex z,
-       const int d)
+       int d)
 {// {{{
-    double complex power_z = 1;
-    for(size_t ix=1; ix <= d; ++ix) {
-        power_z = power_z * z;
+    double complex res = 1;
+    while (d > 0) {
+        // If d is odd, multiply the result with z
+        if (d & 1)
+            res = res * z;
+
+        // d must be even now
+        d = d >> 1;
+        z = z * z;
     }
-    return power_z;
+    return res;
 }// }}}
 
 /**
