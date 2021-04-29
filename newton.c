@@ -148,7 +148,7 @@ next_newton (double complex z,
 /**
  * Apply the Newton method to z
  */
-void
+inline void
 newton_method (complex double z,
                char * root,
                char * iters)
