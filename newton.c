@@ -31,7 +31,7 @@ int n_threads; // The number of threads
 
 #define TOLERANCE 1e-6 // The tolerance
 #define CANCEL_THRESHOLD 1e10 // The thresold at which to cancel the iteration
-#define MAX_ITERATIONS 99 // The iterations cap in Newton's method
+int max_iters = 100; // The iterations value cap in the convergence image
 
 int exp_d = 0; // The power d
 
@@ -54,10 +54,24 @@ parse_args (int argc,
                 "Prints the newton fractal (attractors and iterations) of the complex function\n"
                 "f(z) = z^d-1.\n\n"
                 "Various options may be given:\n"
+                "  -m<n>  Cap the number of iterations in the convergence image at n. Must be\n"
+                "         less than 256. Defaults to 100 iterations.\n"
                 "  -h     Print this help.\n"
                 "  -s<n>  Make an image with a resolution of n×n. Defaults to 1000×1000.\n"
                 "  -t<n>  Use <n> threads. By default all available cores are used.\n");
             exit (EX_OK);
+        }
+
+        // Option -m: The iterations value cap in the convergence image
+        else if (strncmp ("-m", argv[i], 2) == 0) {
+            max_iters = (int) strtol (argv[i]+2, &rem, 0);
+            if (max_iters == 0 || rem[0] != '\0') {
+                printf ("Error: option -m requires a number as argument! Found: %s\n", argv[i]+2);
+                exit (EX_USAGE);
+            } else if (max_iters <= 0 || max_iters >= 256) {
+                printf ("Error: iterations cap passed to the -m flag has to be in the interval [1,255]!\n");
+                exit (EX_USAGE);
+            }
         }
 
         // Option -s: size of the image (number of rows and columns)
@@ -189,8 +203,8 @@ newton_method (complex double z,
         z = next_newton (z, exp_d); // Iterate z
     }
 
-    // Set number of iterations, but maximal MAX_ITERATIONS
-    *iters = MIN (n_iter, MAX_ITERATIONS);
+    // Set number of iterations, but maximal max_iters
+    *iters = MIN (n_iter, max_iters);
 }// }}}
 
 /**
@@ -256,7 +270,7 @@ write_main (void * args)
     FILE * iters_file = fopen (buf_convergence, "wb");
 
     fprintf (roots_file, "P5\n%d %d\n%d\n", n_rows, n_rows, exp_d);
-    fprintf (iters_file, "P5\n%d %d\n%d\n", n_rows, n_rows, MAX_ITERATIONS);
+    fprintf (iters_file, "P5\n%d %d\n%d\n", n_rows, n_rows, max_iters);
 
     for (size_t ix = 0; ix < n_rows;) {
 
