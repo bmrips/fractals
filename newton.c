@@ -24,9 +24,20 @@ char * item_done; // To mark a row as done
 double * exact_roots_real;
 double * exact_roots_imag;
 
-double step_size; // Step size for starting points of newton method
+// The range on the x- and y-axis
+double x_start = -2,
+       x_end   =  2,
+       y_start = -2,
+       y_end   =  2;
 
-int n_rows = 1000; // The size of the image (number of rows and columns)
+// Step size between the starting points of the newton method
+double x_step_size,
+       y_step_size;
+
+// The ammount of rows and columns
+int n_rows = 1000,
+    n_cols = 1000;
+
 int n_threads; // The number of threads
 
 #define TOLERANCE 1e-6 // The tolerance
@@ -54,11 +65,17 @@ parse_args (int argc,
                 "Prints the newton fractal (attractors and iterations) of the complex function\n"
                 "f(z) = z^d-1.\n\n"
                 "Various options may be given:\n"
-                "  -m<n>  Cap the number of iterations in the convergence image at n. Must be\n"
-                "         less than 256. Defaults to 100 iterations.\n"
-                "  -h     Print this help.\n"
-                "  -s<n>  Make an image with a resolution of n×n. Defaults to 1000×1000.\n"
-                "  -t<n>  Use <n> threads. By default all available cores are used.\n");
+                "  -m<n>      Cap the number of iterations in the convergence image at n. Must be\n"
+                "             less than 256. Defaults to 100 iterations.\n"
+                "  -h         Print this help.\n"
+                "  -r<n>      Make an image with a resolution of n pixels in breadth. The amount\n"
+                "             of pixels in height are calculated to match the ratio of x-axis to\n"
+                "             y-axis range. Defaults to 1000.\n"
+                "  -t<n>      Use <n> threads. By default all available cores are used.\n"
+                "  -x<s>,<e>  The range on the x-axis, where the newton method is applied to.\n"
+                "             Defaults to [-2, 2].\n"
+                "  -y<s>,<e>  The range on the y-axis, where the newton method is applied to.\n"
+                "             Defaults to [-2, 2].\n");
             exit (EX_OK);
         }
 
@@ -74,14 +91,14 @@ parse_args (int argc,
             }
         }
 
-        // Option -s: size of the image (number of rows and columns)
-        else if (strncmp ("-s", argv[i], 2) == 0) {
-            n_rows = (int) strtol (argv[i]+2, &rem, 0);
-            if (n_rows == 0 || rem[0] != '\0') {
-                printf ("Error: option -s requires a number as argument! Found: %s\n", argv[i]+2);
+        // Option -r: size of the image (number of rows and columns)
+        else if (strncmp ("-r", argv[i], 2) == 0) {
+            n_cols = (int) strtol (argv[i]+2, &rem, 0);
+            if (n_cols == 0 || rem[0] != '\0') {
+                printf ("Error: option -r requires a number as argument! Found: %s\n", argv[i]+2);
                 exit (EX_USAGE);
-            } else if (n_rows <= 0) {
-                printf ("Error: number of rows passed to the -s flag has to be positive!\n");
+            } else if (n_cols <= 0) {
+                printf ("Error: number of rows passed to the -r flag has to be positive!\n");
                 exit (EX_USAGE);
             }
         }
@@ -94,6 +111,34 @@ parse_args (int argc,
                 exit (EX_USAGE);
             } else if (n_threads <= 0) {
                 printf ("Error: number of threads passed to the -t flag has to be positive!\n");
+                exit (EX_USAGE);
+            }
+        }
+
+        // Option -x: range on the x-axis
+        else if (strncmp ("-x", argv[i], 2) == 0) {
+            char * tmp;
+            x_start = strtod (argv[i]+2, &tmp);
+            x_end   = strtod (tmp+1, &rem);
+            if (tmp == argv[i]+2 || tmp[0] != ',' || tmp+1 == rem || rem[0] != '\0') {
+                printf ("Error: option -x requires a range as argument! Found: %s\n", argv[i]+2);
+                exit (EX_USAGE);
+            } else if (x_start >= x_end) {
+                printf ("Error: in the given x-range, the end has to be greater than the start!\n");
+                exit (EX_USAGE);
+            }
+        }
+
+        // Option -y: range on the x-axis
+        else if (strncmp ("-y", argv[i], 2) == 0) {
+            char * tmp;
+            y_start = strtod (argv[i]+2, &tmp);
+            y_end   = strtod (tmp+1, &rem);
+            if (tmp == argv[i]+2 || tmp[0] != ',' || tmp+1 == rem || rem[0] != '\0') {
+                printf ("Error: option -y requires a range as argument! Found: %s\n", argv[i]+2);
+                exit (EX_USAGE);
+            } else if (y_start >= y_end) {
+                printf ("Error: in the given y-range, the end has to be greater than the start!\n");
                 exit (EX_USAGE);
             }
         }
@@ -218,7 +263,7 @@ compute_main (void * args)
     free (args);
 
     double complex z;
-    size_t buffer_size = n_rows * sizeof(unsigned char);
+    size_t buffer_size = n_cols * sizeof(unsigned char);
 
     for (size_t ix = offset; ix < n_rows; ix += n_threads) {
 
@@ -227,8 +272,8 @@ compute_main (void * args)
         unsigned char * iters_row = malloc (buffer_size);
 
         // Compute the root using the Newton method for each item in the row ix
-        for (size_t jx = 0; jx < n_rows; jx++) {
-            z = (-2 + jx*step_size) + I * (2 - ix*step_size);
+        for (size_t jx = 0; jx < n_cols; jx++) {
+            z = (x_start + jx*x_step_size) + I * (y_end - ix*y_step_size);
             newton_method (z, roots_row + jx, iters_row + jx);
         }
 
@@ -269,8 +314,8 @@ write_main (void * args)
     FILE * roots_file = fopen (buf_attractors, "wb");
     FILE * iters_file = fopen (buf_convergence, "wb");
 
-    fprintf (roots_file, "P5\n%d %d\n%d\n", n_rows, n_rows, exp_d);
-    fprintf (iters_file, "P5\n%d %d\n%d\n", n_rows, n_rows, max_iters);
+    fprintf (roots_file, "P5\n%d %d\n%d\n", n_cols, n_rows, exp_d);
+    fprintf (iters_file, "P5\n%d %d\n%d\n", n_cols, n_rows, max_iters);
 
     for (size_t ix = 0; ix < n_rows;) {
 
@@ -287,8 +332,8 @@ write_main (void * args)
 
         // Write to the files
         for (; ix < n_rows && item_done_loc[ix] != 0; ++ix) {
-            fwrite (roots[ix], sizeof(unsigned char), n_rows, roots_file);
-            fwrite (iters[ix], sizeof(unsigned char), n_rows, iters_file);
+            fwrite (roots[ix], sizeof(unsigned char), n_cols, roots_file);
+            fwrite (iters[ix], sizeof(unsigned char), n_cols, iters_file);
             free (roots[ix]);
             free (iters[ix]);
         }
@@ -311,7 +356,11 @@ main (int argc,
 
     parse_args (argc, argv);
 
-    step_size = 4.0 / (n_rows-1); // The step size when changing z.
+    double x_width = (x_end - x_start),
+           y_width = (y_end - y_start);
+    n_rows = (int) (n_cols * y_width / x_width);
+    x_step_size = x_width / (n_cols-1);
+    y_step_size = y_width / (n_rows-1);
 
     // Compute the exact roots
     exact_roots_real = malloc (exp_d * sizeof(double));
