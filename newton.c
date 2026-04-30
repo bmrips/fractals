@@ -72,10 +72,8 @@ parse_args (int argc,
                 "             of pixels in height are calculated to match the ratio of x-axis to\n"
                 "             y-axis range. Defaults to 1000.\n"
                 "  -t<n>      Use <n> threads. By default all available cores are used.\n"
-                "  -x<s>,<e>  The range on the x-axis, where the newton method is applied to.\n"
-                "             Defaults to [-2, 2].\n"
-                "  -y<s>,<e>  The range on the y-axis, where the newton method is applied to.\n"
-                "             Defaults to [-2, 2].\n");
+                "  -x<s>,<e>  The range [s, e] on the x-axis to be processed. Defaults to [-2, 2].\n"
+                "  -y<s>,<e>  The range [s, e] on the y-axis to be processed. Defaults to [-2, 2].\n");
             exit (EX_OK);
         }
 
